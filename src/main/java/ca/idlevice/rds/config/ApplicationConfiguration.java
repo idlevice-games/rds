@@ -16,6 +16,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.config.AbstractReactiveMongoConfiguration;
 import org.springframework.data.mongodb.core.ReactiveMongoOperations;
 import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRepositories;
 import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoClients;
@@ -44,10 +47,22 @@ class ApplicationConfiguration extends AbstractReactiveMongoConfiguration {
         this.environment = environment;
     }
 
+
+
+
+
+
     @Bean
     public MongoClient reactiveMongoClient() {
-        int port = environment.getProperty("local.mongo.port", Integer.class);
-        return MongoClients.create(String.format("mongodb://localhost:%d", port));
+        //int port = environment.getProperty("local.mongo.port", Integer.class);
+        String connection = "mongodb://" +
+                environment.getProperty("database.user", String.class) + ":" +
+                environment.getProperty("database.password", String.class) + "@" +
+                environment.getProperty("database.server", String.class);
+        System.out.println(connection);
+
+
+        return MongoClients.create(connection);
     }
 
     public @Bean
@@ -57,7 +72,7 @@ class ApplicationConfiguration extends AbstractReactiveMongoConfiguration {
 
     @Override
     protected String getDatabaseName() {
-        return "test";
+        return "rdk1";
     }
 
     // Reactive routing
@@ -80,26 +95,36 @@ class ApplicationConfiguration extends AbstractReactiveMongoConfiguration {
     @Component
     class WorldCLR implements CommandLineRunner
     {
-
         private final WorldRepository worldRepository;
         ReactiveMongoOperations operations;
 
-        public WorldCLR(WorldRepository worldRepository)
+        @Autowired
+        public WorldCLR(WorldRepository worldRepository, ReactiveMongoOperations operations)
         {
             this.worldRepository = worldRepository;
+            this.operations = operations;
         }
 
 
         public void run(String... strings) throws Exception
         {
 
-            operations.collectionExists(World.class)
+            /*operations.collectionExists(World.class)
                     .flatMap(exists -> exists ? operations.dropCollection(World.class) : just(exists))
                     .flatMap(o -> operations.createCollection(World.class))
                     .then()
-                    .block();
+                    .block();*/
+
 
            worldRepository.saveAll(Flux.just((new World("Earth",11)))).subscribe();
+
+           Query query = new Query();
+           query.addCriteria(Criteria.where("worldName").is("Earth"));
+
+           Update update = new Update();
+           update.set("age", 100);
+
+                 operations.updateFirst(query, update, World.class).subscribe();
 
 
         }
